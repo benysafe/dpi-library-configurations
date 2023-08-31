@@ -1,0 +1,60 @@
+{
+	"module":
+	{
+		"id":"",
+		"name":""
+	},
+	"publishers":
+	[
+		{	
+		//se adapta a cada tipo de publicador
+		}
+	],
+	"serializers":
+	[
+		{
+			"id":"",
+			"name":"",
+			"mssgtypes": 
+			[
+				{
+					"id": "",
+					"name": "",
+					"recipients": 
+					[
+						{
+							"publisher_id": "",
+							"recipient": ""
+						}
+					]
+				}
+			]
+		}
+	],
+	"suscriptors":
+	[
+		{
+			"id":"",
+			"name":"",
+			"host":"",
+			"port":"",
+			"uri":"",
+			"concurrentThread":"",
+			"mssgBoxes":
+			[
+				{
+					"recipient": "",
+					"deserializerId": ""
+				},
+			],
+			"mssgBoxType": "queue/topic"
+		}
+	],
+	"processors":
+	[	
+		{
+		}
+	]
+}
+			
+		
