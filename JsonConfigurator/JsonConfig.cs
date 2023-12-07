@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Timers;
 using InterfaceLibraryConfigurator;
 using InterfaceLibraryLogger;
 using NLog;
 using Definitions;
+using System.Threading;
 
 namespace JsonConfigurator
 {
@@ -14,6 +17,14 @@ namespace JsonConfigurator
         private Logger _logger;
         private string _path;
         private Dictionary<string, object> _config;
+        private Dictionary<string, object> _tempConfig;
+
+        private int _valueTimer = 30;
+        private string _strHashConfig;
+        private string _tempHash;
+
+        private System.Timers.Timer _timer = new System.Timers.Timer();
+
         public void addParameter(string parameter, string value)
         {
             try
@@ -41,7 +52,7 @@ namespace JsonConfigurator
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
         }
 
@@ -64,7 +75,7 @@ namespace JsonConfigurator
                     string tem = value.GetType().ToString();
                     if (value.GetType().ToString()== "System.Text.Json.JsonElement")
                     {
-                        list = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object>>>(value.ToString()); 
+                        list = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(value.ToString()); 
                     }
                     else
                     {
@@ -93,7 +104,7 @@ namespace JsonConfigurator
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
         }
 
@@ -111,13 +122,14 @@ namespace JsonConfigurator
                 }
                 else
                 {
+                    _logger.Trace("Fin");
                     return value.ToString();
                 }
             }
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
         }
      
@@ -126,11 +138,13 @@ namespace JsonConfigurator
             try
             {
                 _logger = (Logger)logger.init("JsonConfigurator");
+
+                _timer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
         }
 
@@ -143,31 +157,99 @@ namespace JsonConfigurator
                 string jsonConfig = File.ReadAllText(path);
                 _config = JsonSerializer.Deserialize<Dictionary<string,object>>(jsonConfig);
 
+                _strHashConfig = makeHashProcessorSection(_config);
+
+                object value;
+                if (_config.TryGetValue("module", out value))
+                {
+                    Dictionary<string, object> dModule = JsonSerializer.Deserialize<Dictionary<string, object>>(value.ToString()); ;
+                    if (dModule.TryGetValue("watchConfig", out value))
+                    {
+                        _valueTimer = Convert.ToInt32(value.ToString());
+                    }
+                }
+                _logger.Debug($"'watchConfig' establecido en {_valueTimer} segundos");
+
+                _config.Add("watchConfig", _valueTimer);
+
+                _timer.Interval = _valueTimer * 1000;
+                _timer.Enabled = true;
+
                 _logger.Trace("Fin");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
         }
     
-        public bool reLoad()
+        public bool hasNewConfig()
         {
             try
             {
-                _logger.Trace("Inicio");
-
-                load(_path);
-
-                _logger.Trace("Fin");
-                return true;
+                bool newConfig = _strHashConfig != _tempHash;
+                if (newConfig)
+                {
+                    _config = _tempConfig;
+                    _strHashConfig = _tempHash;
+                }
+                return newConfig;
             }
             catch (Exception ex)
             {
                 _logger.Error(ex.ToString());
-                throw ex;
+                throw new Exception(ex.ToString());
             }
+        }
+
+        private string makeHashProcessorSection(Dictionary<string, object> config)
+        {
+            try
+            {
+                object value;
+                if (!config.TryGetValue("processors", out value))
+                {
+                    _logger.Error("No se encontro el parametro 'processors' en el fichero de configuracion");
+                    throw new Exception("No se encontro el parametro 'processors' en el fichero de configuracion");
+                }
+                return HashString(value.ToString());
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex.ToString());
+                throw new Exception(ex.ToString());
+            }
+        }
+
+        private string HashString(string text)
+        {
+            if (String.IsNullOrEmpty(text))
+            {
+                return String.Empty;
+            }
+
+            // Uses SHA256 to create the hash
+            using (var sha = SHA1.Create())
+            {
+                // Convert the string to a byte array first, to be processed
+                byte[] textBytes = System.Text.Encoding.UTF8.GetBytes(text);
+                byte[] hashBytes = sha.ComputeHash(textBytes);
+
+                // Convert back to a string, removing the '-' that BitConverter adds
+                string hash = BitConverter
+                    .ToString(hashBytes)
+                    .Replace("-", String.Empty);
+
+                return hash;
+            }
+        }
+
+        private void OnTimedEvent(object source, ElapsedEventArgs e)
+        {
+            string jsonConfig = File.ReadAllText(_path);
+            _tempConfig = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonConfig);
+            _tempHash = makeHashProcessorSection(_tempConfig);
         }
     }
 }

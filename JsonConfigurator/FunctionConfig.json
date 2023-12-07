@@ -2,7 +2,8 @@
 	"module":
 	{
 		"id":"",
-		"name":""
+		"name": "",
+		"watchConfig": "" //en segundos, valor de desbordamiento del timer que verifica si hay cambios en el fichero de configuración, si no esta se usa por defecto 30 segundos 
 	},
 	"publishers":
 	[
