@@ -20,8 +20,9 @@ namespace JsonConfigurator
         private Dictionary<string, object> _tempConfig;
 
         private int _valueTimer = 30;
-        private string _strHashConfig;
-        private string _tempHash;
+
+        private Dictionary<string,string> _dirHashesConfig = new Dictionary<string, string>();
+        private Dictionary<string,string> _tempDirHashes = new Dictionary<string, string>();
 
         private System.Timers.Timer _timer = new System.Timers.Timer();
 
@@ -157,7 +158,14 @@ namespace JsonConfigurator
                 string jsonConfig = File.ReadAllText(path);
                 _config = JsonSerializer.Deserialize<Dictionary<string,object>>(jsonConfig);
 
-                _strHashConfig = makeHashProcessorSection(_config);
+                if(_config.ContainsKey("suscriptors"))
+                    makeHashSection(_config, "suscriptors",ref _dirHashesConfig);
+                if (_config.ContainsKey("publishers"))
+                    makeHashSection(_config, "publishers", ref _dirHashesConfig);
+                if (_config.ContainsKey("serializers"))
+                    makeHashSection(_config, "serializers", ref _dirHashesConfig);
+                if (_config.ContainsKey("processors"))
+                    makeHashSection(_config, "processors", ref _dirHashesConfig);
 
                 object value;
                 if (_config.TryGetValue("module", out value))
@@ -184,17 +192,27 @@ namespace JsonConfigurator
             }
         }
     
-        public bool hasNewConfig()
+        public bool hasNewConfig(string id)
         {
             try
             {
-                bool newConfig = _strHashConfig != _tempHash;
-                if (newConfig)
+                if (_dirHashesConfig.ContainsKey(id))
                 {
-                    _config = _tempConfig;
-                    _strHashConfig = _tempHash;
+                    bool newConfig = _dirHashesConfig[id] != _tempDirHashes[id];
+                    if (newConfig)
+                    {
+                        _config = _tempConfig;
+                        _dirHashesConfig.Remove(id);
+                        _dirHashesConfig.Add(id, _tempDirHashes[id]);
+                        _logger.Debug("Hay cambio de configuracion en la seccion con id '" + id + "' del fichero de configuracion");
+                    }
+                    return newConfig;
                 }
-                return newConfig;
+                else
+                {
+                    _logger.Error("No se encontro ninguna referencia a la seccion con id '"+id+"' en el fichero de configuracion");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
@@ -203,17 +221,31 @@ namespace JsonConfigurator
             }
         }
 
-        private string makeHashProcessorSection(Dictionary<string, object> config)
+        private bool makeHashSection(Dictionary<string, object> config, string section, ref Dictionary<string, string> dicOut )
         {
             try
             {
                 object value;
-                if (!config.TryGetValue("processors", out value))
+                if (config.TryGetValue(section, out value))
                 {
-                    _logger.Error("No se encontro el parametro 'processors' en el fichero de configuracion");
-                    throw new Exception("No se encontro el parametro 'processors' en el fichero de configuracion");
+                    List<object> subSections = JsonSerializer.Deserialize<List<object>>(value.ToString());
+                    for (int i = 0; i < subSections.Count; i++)
+                    {
+                        object idSubSection;
+                        string sHash;
+                        Dictionary<string, object> dicSubSection = JsonSerializer.Deserialize<Dictionary<string, object>>(subSections[i].ToString());
+                        if (!dicSubSection.TryGetValue("id", out idSubSection))
+                        {
+                            _logger.Error("No se encontro el parametro 'id' en el elemento '" + i.ToString() + "' de la seccion '" + section + "' del fichero de configuracion.");
+                            throw new Exception("No se encontro el parametro 'id' en el elemento '" + i.ToString() + "' de la seccion '" + section + "' del fichero de configuracion.");
+                        }
+                        sHash = HashString(subSections[i].ToString());
+                        dicOut.Remove(idSubSection.ToString());
+                        dicOut.Add(idSubSection.ToString(), sHash);
+                    }
+                    return true;
                 }
-                return HashString(value.ToString());
+                return false;
             }
             catch (Exception ex)
             {
@@ -249,7 +281,14 @@ namespace JsonConfigurator
         {
             string jsonConfig = File.ReadAllText(_path);
             _tempConfig = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonConfig);
-            _tempHash = makeHashProcessorSection(_tempConfig);
+            if (_config.ContainsKey("suscriptors"))
+                makeHashSection(_tempConfig, "suscriptors", ref _tempDirHashes);
+            if (_config.ContainsKey("publishers"))
+                makeHashSection(_tempConfig, "publishers", ref _tempDirHashes);
+            if (_config.ContainsKey("serializers"))
+                makeHashSection(_tempConfig, "serializers", ref _tempDirHashes);
+            if (_config.ContainsKey("processors"))
+                makeHashSection(_tempConfig, "processors", ref _tempDirHashes);
         }
     }
 }
