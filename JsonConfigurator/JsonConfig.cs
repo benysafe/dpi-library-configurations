@@ -158,15 +158,24 @@ namespace JsonConfigurator
                 string jsonConfig = File.ReadAllText(path);
                 _config = JsonSerializer.Deserialize<Dictionary<string,object>>(jsonConfig);
 
-                if(_config.ContainsKey("suscriptors"))
-                    makeHashSection(_config, "suscriptors",ref _dirHashesConfig);
+                if (_config.ContainsKey("suscriptors"))
+                {
+                    makeHashSection(_config, "suscriptors", ref _dirHashesConfig);
+                }
                 if (_config.ContainsKey("publishers"))
+                {
                     makeHashSection(_config, "publishers", ref _dirHashesConfig);
+                }
                 if (_config.ContainsKey("serializers"))
+                {
                     makeHashSection(_config, "serializers", ref _dirHashesConfig);
+                }
                 if (_config.ContainsKey("processors"))
+                {
                     makeHashSection(_config, "processors", ref _dirHashesConfig);
+                }
 
+                _tempDirHashes = _dirHashesConfig;
                 object value;
                 if (_config.TryGetValue("module", out value))
                 {
@@ -196,8 +205,11 @@ namespace JsonConfigurator
         {
             try
             {
-                if (_dirHashesConfig.ContainsKey(id))
+                if (_dirHashesConfig.ContainsKey(id) && _tempDirHashes.ContainsKey(id))
                 {
+                    _logger.Debug("Old hashConfig: '" + _dirHashesConfig[id]);
+                    _logger.Debug("New hashConfig: '" + _tempDirHashes[id]);
+
                     bool newConfig = _dirHashesConfig[id] != _tempDirHashes[id];
                     if (newConfig)
                     {
@@ -216,8 +228,10 @@ namespace JsonConfigurator
             }
             catch (Exception ex)
             {
+                _logger.Error("Falló el mecanismo de chequeo de reconfiguración por: "); 
                 _logger.Error(ex.ToString());
-                throw new Exception(ex.ToString());
+                return false;
+                //throw new Exception(ex.ToString());
             }
         }
 
